@@ -1,0 +1,20 @@
+# OpenSCAD
+*.stl.bak
+*.scad.bak
+*.scad~
+
+# Backup copies
+*copy*.scad
+*Copy*.scad
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor Files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
