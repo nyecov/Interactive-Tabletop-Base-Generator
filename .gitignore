@@ -1,5 +1,6 @@
-# OpenSCAD
+# OpenSCAD - Generated Files
 *.stl
+*.3mf
 *.stl.bak
 *.scad.bak
 *.scad~
