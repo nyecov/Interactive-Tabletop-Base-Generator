@@ -115,7 +115,20 @@ This project is designed for the wargaming and 3D printing community. If you hav
 
 ## 📄 License
 
-This project is released under the **MIT License**. You are free to use, modify, and distribute this script for personal or commercial projects.
+This project is licensed under **Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)**.
+
+### Summary:
+- ✅ **Personal use** and customization freely allowed
+- ✅ **Share and remix** with proper attribution to Enginseer.Prime
+- ✅ **Educational and research** purposes permitted
+- ❌ **Commercial use** requires a separate commercial license
+
+### Commercial Licensing:
+Commercial licenses are available for businesses and commercial makers. Please contact:
+
+**Enginseer.Prime** on MakerWorld: [@Enginseer.Prime](https://makerworld.com/en/@Enginseer.Prime)
+
+For full license details, see the [LICENSE](LICENSE) file.
 
 ---
 
