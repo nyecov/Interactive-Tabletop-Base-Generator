@@ -47,6 +47,13 @@ custom_oval_length_mm = 90.0; // [20.0:1.0:200.0]
 // Custom oval width (minor axis) in mm
 custom_oval_width_mm = 52.0; // [20.0:1.0:200.0]
 
+/* [Hidden] */
+// CLI Override for base shape (0=Round, 1=Polygon, 2=Oval, -1=Use base_type)
+base_shape_index = -1;
+actual_base_type = (base_shape_index == 0) ? "Round" : 
+                  (base_shape_index == 1) ? "Polygon" : 
+                  (base_shape_index == 2) ? "Oval" : base_type;
+
 /* [3. Hollowing / Shelling] */
 // Enable shelling (hollow base to save material)
 enable_shelling = true;
@@ -79,7 +86,7 @@ rib_height_mm = 2.0; // [0.5:0.1:10.0]
 rib_length_mm = 0.0; // [0.0:1.0:100.0]
 
 // Recess for magnet pillars from bottom edge in mm (ensure flushness)
-pillar_recess_mm = 0.2; // [0.0:0.1:2.0]
+pillar_recess_mm = 0.5; // [0.0:0.1:2.0]
 
 /* [4. Magnet System] */
 // Enable magnet pockets (uncheck to remove all magnet features)
@@ -89,13 +96,13 @@ enable_magnet_pockets = true;
 magnet_shape = "Round"; // [None, Round, Square, Rectangular]
 
 // Magnet Diameter (Round) or Side A Length (Square/Rect) in mm
-magnet_dim_a_mm = 6.0; // [1.0:0.1:50.0]
+magnet_dim_a_mm = 8.0; // [1.0:0.1:50.0]
 
 // Magnet Side B Width (only for Rectangular) in mm
 magnet_dim_b_mm = 3.0; // [1.0:0.1:50.0]
 
 // Thickness of the MAGNET (depth of pocket) in mm
-magnet_thick_mm = 2.7; // [0.5:0.1:10.0]
+magnet_thick_mm = 2.0; // [0.5:0.1:10.0]
 
 // Extra clearance for magnet fit (per side) in mm. Total pocket width = magnet + 2*tolerance
 magnet_tolerance_mm = 0.1; // [0.00:0.05:1.0]
@@ -119,7 +126,7 @@ magnet_ring_radius_mm = 8.0; // [2.0:0.5:40.0]
 
 /* [5. Glue Retention] */
 // Enable helical/slanted glue channels in magnet pockets
-glue_channels_enabled = false;
+glue_channels_enabled = true;
 
 // Number of glue channels per pocket (Round magnets only)
 glue_channel_count = 3; // [1:1:5]
@@ -130,9 +137,13 @@ glue_channel_rotation_deg = 45; // [0:15:720]
 // Channel diameter in mm (cross-section of the groove)
 glue_channel_diameter_mm = 0.8; // [0.3:0.1:2.0]
 
+/* [6. Model Quality] */
+// Model resolution (polycount/smoothness)
+model_resolution = 100; // [20:10:200]
+
 /* [Hidden] */
 // === CONSTANTS (Internal - not exposed in Customizer) ===
-$fn = 100;                    // Resolution for round shapes
+$fn = model_resolution;       // Resolution for round shapes
 in_to_mm = 25.4;              // Inches to mm conversion factor
 OVERLAP = 0.05;               // Standard overlap for boolean operations (avoids co-planar artifacts)
 MIN_TOP_SOLID = 0.6;          // Minimum solid material above magnet pocket
@@ -184,7 +195,7 @@ oval_width = oval_dims[1];  // Minor axis
 
 // For ovals, use the minor axis (width) as the "size" for magnet boundary calculations
 // since it's the limiting dimension
-is_oval = (base_type == "Oval");
+is_oval = (actual_base_type == "Oval");
 
 // === EARLY DIMENSION VALIDATION ===
 // Validate oval dimensions
@@ -273,8 +284,8 @@ remaining_thickness = base_height - total_pocket_height;
 function get_radius(size, sides, is_poly) = 
     is_poly ? (size / 2) / cos(180 / sides) : (size / 2);
 
-sides_fn = (base_type == "Polygon") ? poly_sides : $fn;
-is_polygon = (base_type == "Polygon");
+sides_fn = (actual_base_type == "Polygon") ? poly_sides : $fn;
+is_polygon = (actual_base_type == "Polygon");
 
 // Bottom Radius (Base)
 r_bottom = get_radius(base_size, sides_fn, is_polygon);
@@ -309,7 +320,7 @@ assert(!is_oval || (oval_width - 2 * oval_flare_reduction) > 0,
 // Final safety check for remaining top thickness (should now be guaranteed by auto-correction)
 assert(!has_magnet || remaining_thickness >= min_solid_cap - OVERLAP, "Internal Error: Base thickness calculation failed.");
 
-assert(base_type != "Polygon" || poly_sides >= 3,
+assert(actual_base_type != "Polygon" || poly_sides >= 3,
     str("\nERROR: Invalid polygon sides!\n",
         "FIX: Set 'poly_sides' to 3 or more (current: ", poly_sides, ")."));
 
@@ -599,7 +610,7 @@ module magnet_pocket_keepouts() {
             cylinder(r = keepout_radius, h = base_height - shell_top_thickness_mm - actual_pillar_recess + OVERLAP * 2, $fn = $fn);
             
             if (enable_ribs) {
-                render_pocket_ribs(keepout_radius, 4, true); // True = centered X pattern
+                render_pocket_ribs(keepout_radius, ribs_per_pocket, true); // True = centered X pattern
             }
         } else {
             // Case 2 & 3: Multi-magnet

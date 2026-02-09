@@ -1,0 +1,23 @@
+{
+  "generation_logic": {
+    "shapes": ["Round", "Square", "Hexagon", "Octagon", "Oval"],
+    "sizes_mm": [25, 32, 40, 50, 60, 65, 70, 80, 90, 100, 130, 160],
+    "sizes_inch": [1, 2, 3],
+    "magnet_scaling_mm2": [
+      { "threshold": 0, "magnets": 1, "ribs": 2 },
+      { "threshold": 800, "magnets": 2, "ribs": 2 },
+      { "threshold": 2500, "magnets": 4, "ribs": 3 },
+      { "threshold": 6000, "magnets": 7, "ribs": 3 }
+    ],
+    "magnet_specs": {
+      "diameter_mm": 8.0,
+      "thickness_mm": 2.0,
+      "tolerance_mm": 0.1,
+      "pocket_clearance_mm": 8.2
+    },
+    "output_structure": {
+      "root": "Generated_3mf",
+      "subfolders": ["Magnet", "No_Magnet"]
+    }
+  }
+}
