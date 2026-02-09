@@ -1,8 +1,8 @@
-# OpenSCAD - Generated Files
-*.stl
-*.3mf
-*.stl.bak
-*.scad.bak
+# Temporary and Audit Files
+Temp_*/
+*/Temp_*/
+*.zip
+*.bak
 *.scad~
 
 # Backup copies

@@ -100,8 +100,6 @@ def generate_main_model(objects):
 <model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:BambuStudio="http://schemas.bambulab.com/package/2021" xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06" requiredextensions="p">
  <metadata name="Application">BambuStudio-02.05.00.66</metadata>
  <metadata name="BambuStudio:3mfVersion">1</metadata>
- <metadata name="Thumbnail_Middle">/Metadata/plate_1.png</metadata>
- <metadata name="Thumbnail_Small">/Metadata/plate_1_small.png</metadata>
  <resources>
 {chr(10).join(resources)}
  </resources>
@@ -138,10 +136,6 @@ def generate_model_settings(objects):
         plate_entries.append(f'''  <plate>
     <metadata key="plater_id" value="{plate_id}"/>
     <metadata key="plater_name" value="{name}"/>
-    <metadata key="thumbnail_file" value="Metadata/plate_{plate_id}.png"/>
-    <metadata key="thumbnail_no_light_file" value="Metadata/plate_no_light_{plate_id}.png"/>
-    <metadata key="top_file" value="Metadata/top_{plate_id}.png"/>
-    <metadata key="pick_file" value="Metadata/pick_{plate_id}.png"/>
     <model_instance>
       <metadata key="object_id" value="{wrapper_id}"/>
       <metadata key="instance_id" value="0"/>
@@ -209,26 +203,21 @@ def build_3mf(stl_files, template_path, output_path):
         root_rels = '''<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
  <Relationship Target="/3D/3dmodel.model" Id="rel-1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>
- <Relationship Target="/Metadata/plate_1.png" Id="rel-2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail"/>
- <Relationship Target="/Metadata/plate_1.png" Id="rel-4" Type="http://schemas.bambulab.com/package/2021/cover-thumbnail-middle"/>
- <Relationship Target="/Metadata/plate_1_small.png" Id="rel-5" Type="http://schemas.bambulab.com/package/2021/cover-thumbnail-small"/>
 </Relationships>'''
         zf.writestr('_rels/.rels', root_rels)
         
         # 2c. Copy from template
         with zipfile.ZipFile(template_path, 'r') as tz:
             for item in tz.infolist():
+                # Skip core files we generate ourselves
                 if item.filename in ['3D/3dmodel.model', 'Metadata/model_settings.config', 'Metadata/filament_sequence.json', '[Content_Types].xml', '_rels/.rels']:
+                    continue
+                # Skip thumbnails as requested
+                if 'Metadata/' in item.filename and item.filename.endswith('.png'):
                     continue
                 
                 content = tz.read(item.filename)
                 zf.writestr(item.filename, content)
-                
-                # Multiply thumbnails for all plates
-                if 'Metadata/' in item.filename and '_1.png' in item.filename:
-                    for p in range(2, len(objects) + 1):
-                        new_name = item.filename.replace('_1.png', f'_{p}.png')
-                        zf.writestr(new_name, content)
         
         # 2d. Add generated files
         zf.writestr('3D/3dmodel.model', generate_main_model(objects))
