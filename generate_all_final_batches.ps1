@@ -1,6 +1,7 @@
 # Master Batch Generation for All Base Types
 param(
-    [string]$OpenScadPath = "C:\Program Files\OpenSCAD\openscad.exe"
+    [string]$OpenScadPath = "C:\Program Files\OpenSCAD (Nightly)\openscad.exe",
+    [bool]$UseManifold = $true
 )
 
 # $ErrorActionPreference = "Stop" # OpenSCAD logs can trigger false positives
@@ -91,7 +92,8 @@ foreach ($shape in $shapes) {
             }
 
             Write-Host "  Rendering: $($size.Name)..."
-            & $OpenScadPath -o $stlPath $params $InputScad 2>&1 | Out-Null
+            $manifoldFlag = if ($UseManifold) { "--enable=manifold" } else { "" }
+            & $OpenScadPath $manifoldFlag -o $stlPath $params $InputScad 2>&1 | Out-Null
             if (Test-Path $stlPath) { $stlFiles += $stlPath }
         }
 
@@ -136,7 +138,8 @@ foreach ($withMagnet in @($true, $false)) {
         }
 
         Write-Host "  Rendering: $($oval.Name)..."
-        & $OpenScadPath -o $stlPath $params $InputScad 2>&1 | Out-Null
+        $manifoldFlag = if ($UseManifold) { "--enable=manifold" } else { "" }
+        & $OpenScadPath $manifoldFlag -o $stlPath $params $InputScad 2>&1 | Out-Null
         if (Test-Path $stlPath) { $stlFiles += $stlPath }
     }
 

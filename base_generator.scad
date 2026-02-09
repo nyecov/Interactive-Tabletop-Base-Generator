@@ -520,7 +520,7 @@ module base_body() {
         // Magnet Pockets
         if (has_magnet) {
             translate([0, 0, actual_pillar_recess - OVERLAP]) // Overlap for clean cut
-            all_magnet_pockets();
+            union() all_magnet_pockets();
         }
         
         // Shelling cavity (hollow out the interior)
@@ -579,7 +579,7 @@ module shell_cavity() {
         
         // 3. Subtract keepout zones around magnet pockets (these stayed solid inside the cavity)
         if (has_magnet) {
-            magnet_pocket_keepouts();
+            union() magnet_pocket_keepouts();
         }
     }
 }
@@ -603,45 +603,47 @@ module magnet_pocket_keepouts() {
     // 2. Multiple magnets (center + ring) -> Center gets NO ribs, ring pockets get ribs_per_pocket
     // 3. Ring magnets -> First rib points to center, others equally spaced.
     
-    if (has_magnet) {
-        if (effective_count == 1) {
-            // Case 1: Single pocket - standard 4-way support
-            translate([0, 0, actual_pillar_recess - OVERLAP])
-            cylinder(r = keepout_radius, h = base_height - shell_top_thickness_mm - actual_pillar_recess + OVERLAP * 2, $fn = $fn);
-            
-            if (enable_ribs) {
-                render_pocket_ribs(keepout_radius, ribs_per_pocket, true); // True = centered X pattern
-            }
-        } else {
-            // Case 2 & 3: Multi-magnet
-            // Loop through positions manually to handle center vs outer logic
-            
-            // Outer Pockets (Case 3)
-            if (effective_count == 2) {
-                for (i = [0, 180]) {
-                    rotate([0, 0, i])
-                    translate([actual_pair_distance / 2, 0, 0]) {
-                        translate([0, 0, actual_pillar_recess - OVERLAP])
-                        cylinder(r = keepout_radius, h = base_height - shell_top_thickness_mm - actual_pillar_recess + OVERLAP * 2, $fn = $fn);
-                        
-                        if (enable_ribs) render_pocket_ribs(keepout_radius, ribs_per_pocket, false);
-                    }
-                }
-            } else {
-                // Center Pocket (Case 2: NO RIBS)
+    union() {
+        if (has_magnet) {
+            if (effective_count == 1) {
+                // Case 1: Single pocket - standard 4-way support
                 translate([0, 0, actual_pillar_recess - OVERLAP])
                 cylinder(r = keepout_radius, h = base_height - shell_top_thickness_mm - actual_pillar_recess + OVERLAP * 2, $fn = $fn);
-                // No render_pocket_ribs() called for center!
                 
-                // Ring Pockets (Case 3)
-                ring_count = effective_count - 1;
-                for (i = [1 : ring_count]) {
-                    rotate([0, 0, i * 360 / ring_count])
-                    translate([actual_ring_radius, 0, 0]) {
-                        translate([0, 0, actual_pillar_recess - OVERLAP])
-                        cylinder(r = keepout_radius, h = base_height - shell_top_thickness_mm - actual_pillar_recess + OVERLAP * 2, $fn = $fn);
-                        
-                        if (enable_ribs) render_pocket_ribs(keepout_radius, ribs_per_pocket, false);
+                if (enable_ribs) {
+                    render_pocket_ribs(keepout_radius, ribs_per_pocket, true); // True = centered X pattern
+                }
+            } else {
+                // Case 2 & 3: Multi-magnet
+                // Loop through positions manually to handle center vs outer logic
+                
+                // Outer Pockets (Case 3)
+                if (effective_count == 2) {
+                    for (i = [0, 180]) {
+                        rotate([0, 0, i])
+                        translate([actual_pair_distance / 2, 0, 0]) {
+                            translate([0, 0, actual_pillar_recess - OVERLAP])
+                            cylinder(r = keepout_radius, h = base_height - shell_top_thickness_mm - actual_pillar_recess + OVERLAP * 2, $fn = $fn);
+                            
+                            if (enable_ribs) render_pocket_ribs(keepout_radius, ribs_per_pocket, false);
+                        }
+                    }
+                } else {
+                    // Center Pocket (Case 2: NO RIBS)
+                    translate([0, 0, actual_pillar_recess - OVERLAP])
+                    cylinder(r = keepout_radius, h = base_height - shell_top_thickness_mm - actual_pillar_recess + OVERLAP * 2, $fn = $fn);
+                    // No render_pocket_ribs() called for center!
+                    
+                    // Ring Pockets (Case 3)
+                    ring_count = effective_count - 1;
+                    for (i = [1 : ring_count]) {
+                        rotate([0, 0, i * 360 / ring_count])
+                        translate([actual_ring_radius, 0, 0]) {
+                            translate([0, 0, actual_pillar_recess - OVERLAP])
+                            cylinder(r = keepout_radius, h = base_height - shell_top_thickness_mm - actual_pillar_recess + OVERLAP * 2, $fn = $fn);
+                            
+                            if (enable_ribs) render_pocket_ribs(keepout_radius, ribs_per_pocket, false);
+                        }
                     }
                 }
             }
@@ -682,57 +684,59 @@ module magnet_pocket() {
     side_b = magnet_dim_b + total_magnet_clearance;
     depth = pocket_depth; 
     
-    if (magnet_shape == "Round") {
-        pocket_radius = side_a / 2;
-        
-        // Main pocket
-        cylinder(d = side_a, h = depth, $fn = $fn);
-        // Entry chamfer (cone at bottom)
-        translate([0, 0, -OVERLAP])
-        cylinder(d1 = side_a + POCKET_CHAMFER * 2, d2 = side_a, h = POCKET_CHAMFER + OVERLAP, $fn = $fn);
-        
-        // Glue channels (helical half-circles along pocket edge)
-        if (glue_channels_enabled) {
-            channel_r = glue_channel_diameter_mm / 2;
-            for (i = [0 : glue_channel_count - 1]) {
-                start_angle = i * 360 / glue_channel_count;
-                rotate([0, 0, start_angle])
-                glue_channel_helix(depth, glue_channel_rotation_deg, channel_r, pocket_radius);
-            }
-        }
-        
-    } else if (magnet_shape == "Square" || magnet_shape == "Rectangular") {
-        // Square is just a rectangle with equal sides
-        dim_x = side_a;
-        dim_y = (magnet_shape == "Square") ? side_a : side_b;
-        
-        // Main pocket
-        translate([-dim_x/2, -dim_y/2, 0])
-        cube([dim_x, dim_y, depth]);
-        
-        // Entry chamfer
-        hull() {
+    union() {
+        if (magnet_shape == "Round") {
+            pocket_radius = side_a / 2;
+            
+            // Main pocket
+            cylinder(d = side_a, h = depth, $fn = $fn);
+            // Entry chamfer (cone at bottom)
             translate([0, 0, -OVERLAP])
-            translate([-(dim_x + POCKET_CHAMFER * 2)/2, -(dim_y + POCKET_CHAMFER * 2)/2, 0])
-            cube([dim_x + POCKET_CHAMFER * 2, dim_y + POCKET_CHAMFER * 2, 0.01]);
+            cylinder(d1 = side_a + POCKET_CHAMFER * 2, d2 = side_a, h = POCKET_CHAMFER + OVERLAP, $fn = $fn);
             
-            translate([0, 0, POCKET_CHAMFER])
+            // Glue channels (helical half-circles along pocket edge)
+            if (glue_channels_enabled) {
+                channel_r = glue_channel_diameter_mm / 2;
+                for (i = [0 : glue_channel_count - 1]) {
+                    start_angle = i * 360 / glue_channel_count;
+                    rotate([0, 0, start_angle])
+                    glue_channel_helix(depth, glue_channel_rotation_deg, channel_r, pocket_radius);
+                }
+            }
+            
+        } else if (magnet_shape == "Square" || magnet_shape == "Rectangular") {
+            // Square is just a rectangle with equal sides
+            dim_x = side_a;
+            dim_y = (magnet_shape == "Square") ? side_a : side_b;
+            
+            // Main pocket
             translate([-dim_x/2, -dim_y/2, 0])
-            cube([dim_x, dim_y, 0.01]);
-        }
-        
-        // Glue channels (center of each face)
-        if (glue_channels_enabled) {
-            channel_r = glue_channel_diameter_mm / 2;
-            slant = actual_glue_slant;
+            cube([dim_x, dim_y, depth]);
             
-            // X-faces
-            translate([dim_x/2, 0, 0])  glue_channel_linear(depth, channel_r, slant);
-            rotate([0, 0, 180]) translate([dim_x/2, 0, 0]) glue_channel_linear(depth, channel_r, slant);
+            // Entry chamfer
+            hull() {
+                translate([0, 0, -OVERLAP])
+                translate([-(dim_x + POCKET_CHAMFER * 2)/2, -(dim_y + POCKET_CHAMFER * 2)/2, 0])
+                cube([dim_x + POCKET_CHAMFER * 2, dim_y + POCKET_CHAMFER * 2, 0.01]);
+                
+                translate([0, 0, POCKET_CHAMFER])
+                translate([-dim_x/2, -dim_y/2, 0])
+                cube([dim_x, dim_y, 0.01]);
+            }
             
-            // Y-faces
-            rotate([0, 0, 90])  translate([dim_y/2, 0, 0]) glue_channel_linear(depth, channel_r, slant);
-            rotate([0, 0, 270]) translate([dim_y/2, 0, 0]) glue_channel_linear(depth, channel_r, slant);
+            // Glue channels (center of each face)
+            if (glue_channels_enabled) {
+                channel_r = glue_channel_diameter_mm / 2;
+                slant = actual_glue_slant;
+                
+                // X-faces
+                translate([dim_x/2, 0, 0])  glue_channel_linear(depth, channel_r, slant);
+                rotate([0, 0, 180]) translate([dim_x/2, 0, 0]) glue_channel_linear(depth, channel_r, slant);
+                
+                // Y-faces
+                rotate([0, 0, 90])  translate([dim_y/2, 0, 0]) glue_channel_linear(depth, channel_r, slant);
+                rotate([0, 0, 270]) translate([dim_y/2, 0, 0]) glue_channel_linear(depth, channel_r, slant);
+            }
         }
     }
 }

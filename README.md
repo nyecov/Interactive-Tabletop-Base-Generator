@@ -22,7 +22,7 @@ ITB is a parametric OpenSCAD script that generates customizable, magnet-ready ba
 ## 🚀 Quick Start
 
 ### Prerequisites
-- [OpenSCAD](https://openscad.org/downloads.html) (2021.01 or newer recommended)
+- [OpenSCAD](https://openscad.org/downloads.html): **Version 2026.02.09 (git a19a8a15)** or newer recommended for full Manifold engine support.
 
 ### Usage
 1. Download `base_generator.scad`
