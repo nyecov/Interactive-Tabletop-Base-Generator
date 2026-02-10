@@ -44,18 +44,24 @@ def ensure_dir(path):
             print(f"Error creating directory {path}: {e}")
     return path
 
-def get_rib_specs(area, rib_scaling):
-    """Determine rib count and thickness based on area."""
-    # Default to smallest
-    specs = {'Ribs': rib_scaling[0]['ribs'], 'Thick': rib_scaling[0]['thickness']}
+def get_rib_specs(magnet_count, area, config):
+    """Determine rib count based on magnet count and thickness based on area."""
+    # 1. Look up rib count from mapping
+    mapping = config.get('magnet_rib_mapping', {})
+    # Use str key as JSON keys are strings
+    ribs = mapping.get(str(magnet_count), 3) 
     
-    for rule in rib_scaling:
+    # 2. Look up thickness from scaling rules
+    thickness_scaling = config.get('rib_thickness_scaling', [])
+    thickness = 0.8 # Default
+    
+    for rule in thickness_scaling:
         if area >= rule['area']:
-            specs = {'Ribs': rule['ribs'], 'Thick': rule['thickness']}
+            thickness = rule['thickness']
         else:
             break
             
-    return specs
+    return {'Ribs': ribs, 'Thick': thickness}
 
 def get_magnet_count(base_name, area, matrix_rules):
     """
@@ -228,7 +234,6 @@ def main():
     ensure_dir(GENERATED_DIR)
     
     magnet_matrices = config['magnet_matrices']
-    rib_scaling = config['rib_scaling']
     base_sizes = config['base_sizes']
     oval_sizes = config['oval_sizes']
     shapes = config['shapes']
@@ -299,7 +304,7 @@ def main():
                     magnet_count = counts[mag_idx]
                     
                     # 2. Get Rib Specs
-                    rib_specs = get_rib_specs(area, rib_scaling)
+                    rib_specs = get_rib_specs(magnet_count, area, config)
                     
                     params.update({
                         'enable_magnet_pockets': True,
@@ -333,7 +338,7 @@ def main():
                     continue
 
                 magnet_count = counts[mag_idx]
-                rib_specs = get_rib_specs(area, rib_scaling)
+                rib_specs = get_rib_specs(magnet_count, area, config)
 
                 params.update({
                     'enable_magnet_pockets': True,

@@ -20,3 +20,13 @@ desktop.ini
 *~
 .vscode/
 .idea/
+
+# Generated Artifacts
+generated files/
+Debug_Temp/
+*.stl
+*.3mf
+
+# Python
+__pycache__/
+*.pyc

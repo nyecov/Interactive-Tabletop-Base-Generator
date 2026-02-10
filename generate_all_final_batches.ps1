@@ -41,11 +41,23 @@ $shapes = @(
     @{ Type = "Polygon"; Sides = 8; Name = "oct"; Index = 1; BaseName = "OctBase" }
 )
 
-function Get-Scaling($Area) {
-    if ($Area -lt 800) { return @{ MagCount = 1; Ribs = 3 } }
-    if ($Area -lt 2500) { return @{ MagCount = 2; Ribs = 3 } }
-    if ($Area -lt 6000) { return @{ MagCount = 4; Ribs = 3 } }
-    return @{ MagCount = 7; Ribs = 3 }
+function Get-Scaling($Area, $MagCount) {
+    # 1. Rib count based on Magnet Count
+    $ribs = 3
+    if ($MagCount -eq 1) { $ribs = 3 }
+    elseif ($MagCount -le 3) { $ribs = 4 }
+    elseif ($MagCount -eq 4) { $ribs = 5 }
+    elseif ($MagCount -eq 5) { $ribs = 7 }
+    elseif ($MagCount -le 8) { $ribs = 8 }
+    elseif ($MagCount -eq 9) { $ribs = 10 }
+    else { $ribs = 12 }
+    
+    # 2. Thickness based on Area
+    $thick = 0.8
+    if ($Area -ge 20000) { $thick = 1.6 }
+    elseif ($Area -ge 5000) { $thick = 1.2 }
+    
+    return @{ MagCount = $MagCount; Ribs = $ribs; Thick = $thick }
 }
 
 # --- PROCESS ROUND & POLYGON ---
@@ -87,8 +99,13 @@ foreach ($shape in $shapes) {
             )
             if ($shape.Sides -gt 0) { $params += "-Dpoly_sides=$($shape.Sides)" }
             if ($withMagnet) {
+                # In PS1 version, we still use the old scaling-based magnet count 
+                # but we've updated the rib count logic.
+                $scalingPref = if ($Area -lt 800) { 1 } elseif ($Area -lt 2500) { 2 } elseif ($Area -lt 6000) { 4 } else { 7 }
+                $scaling = Get-Scaling $area $scalingPref
                 $params += "-Dmagnet_count=$($scaling.MagCount)", "-Dribs_per_pocket=$($scaling.Ribs)"
                 $params += "-Dmagnet_dim_a_mm=8.0", "-Dmagnet_thick_mm=2.0", "-Dglue_channels_enabled=true"
+                $params += "-Drib_thickness_mm=$($scaling.Thick)"
             }
 
             Write-Host "  Rendering: $($size.Name)..."
@@ -133,8 +150,11 @@ foreach ($withMagnet in @($true, $false)) {
             '-D$fn=80'
         )
         if ($withMagnet) {
+            $scalingPref = if ($Area -lt 800) { 1 } elseif ($Area -lt 2500) { 2 } elseif ($Area -lt 6000) { 4 } else { 7 }
+            $scaling = Get-Scaling $area $scalingPref
             $params += "-Dmagnet_count=$($scaling.MagCount)", "-Dribs_per_pocket=$($scaling.Ribs)"
             $params += "-Dmagnet_dim_a_mm=8.0", "-Dmagnet_thick_mm=2.0", "-Dglue_channels_enabled=true"
+            $params += "-Drib_thickness_mm=$($scaling.Thick)"
         }
 
         Write-Host "  Rendering: $($oval.Name)..."
