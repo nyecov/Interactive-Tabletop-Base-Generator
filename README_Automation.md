@@ -1,77 +1,122 @@
-# OpenSCAD Automation Guide
+# Batch Generation / Automation Guide
 
-This project uses **Python** and **OpenSCAD** to automate the generation of wargaming bases.
+This guide details how to use the Python-based automation system to generate 3D printable wargaming bases.
+The system is designed to generate bases for two specific use cases: **Steel Rubber Sheets** and **Magnetic Sheets**, with optimized magnet counts for each.
 
-## Prerequisites
+## 🚀 Quick Start
 
-1.  **OpenSCAD**
-    *   Download: [openscad.org](https://openscad.org/downloads.html)
-    *   **Version requirement**: 2026.02.09 (Nightly) or newer for Manifold support.
-    *   Default Path: `C:\Program Files\OpenSCAD (Nightly)\openscad.exe`
-    *   *(If your path is different, update `generate_batches.py`)*
+1.  **Open Terminal** (PowerShell or Command Prompt).
+2.  Navigate to the `batch_generator` directory:
+    ```powershell
+    cd "C:\Users\Furiosa\SCAD\batch_generator"
+    ```
+3.  Run the generation script:
+    ```powershell
+    python generate_batches.py
+    ```
 
-2.  **Python 3.6+**
-    *   Required for running the build scripts.
+**What happens next?**
+- The script reads settings from `batch_config.json`.
+- It launches multiple OpenSCAD processes in parallel (using all CPU cores).
+- It generates `.stl` files for every base size and magnet configuration.
+- It assembles these STLs into **Bambu Studio 3MF** project files.
+- **Output Location**: `../generated files/` (e.g., `C:\Users\Furiosa\SCAD\generated files`)
 
-## Usage
+---
 
-### 🚀 Generate All Batches
-To generate all base sizes (Round, Square, Hex, Octagon, Oval) in both "Magnet" and "Bare" configurations:
+## 📂 Output Structure
 
-```bash
-cd batch_generator
-python generate_batches.py
+The generated files are organized by **Sheet Type** and **Magnet Size**:
+
+```text
+generated files/
+├── Bare/                       # Bases without magnet holes
+│   ├── RoundBase.3mf
+│   └── ...
+├── Magnet_SteelRubber/         # Optimized for Steel Rubber Sheets
+│   ├── Magnet_5x2mm/
+│   │   ├── HexBase_Mag_5x2_SteelRubber.3mf
+│   │   └── ...
+│   ├── Magnet_6x2mm/
+│   └── ...
+└── Magnet_MagneticSheet/       # Optimized for Magnetic Sheets (More magnets)
+    ├── Magnet_5x2mm/
+    │   ├── OvalBase_Mag_5x2_MagneticSheet.3mf
+    │   └── ...
+    └── ...
 ```
-
-**What it does:**
-1.  **Parallel Rendering**: Uses all CPU cores to render STLs with OpenSCAD.
-2.  **Manifold Optimization**: Uses the `--enable=manifold` flag for high-speed rendering.
-3.  **3MF Assembly**: Bundles the STLs into Bambu Studio project files (`.3mf`) with correct slicer settings.
-4.  **Output**: Files are saved in the `generated files/` directory.
 
 ---
 
 ## ⚙️ Configuration (`batch_config.json`)
 
-All batch generation settings are stored in `batch_config.json`. You can modify this file to:
+All settings are stored in `batch_config.json` in the `batch_generator` folder.
 
--   **Change OpenSCAD Path**: Update `"openscad_path"` if your installation is different.
--   **Add New Base Sizes**: Add entries to `"base_sizes"` or `"oval_sizes"`.
--   **Tweak Magnet Logic**: Adjust `"scaling_thresholds"` to change when ribs/magnets are added based on area.
--   **Set CPU Cores**: Manually set `"cpu_cores"` (0 = Auto-detect).
+### 1. General Settings
+- **`openscad_path`**: Path to your OpenSCAD executable.
+  - *Default*: `C:\Program Files\OpenSCAD (Nightly)\openscad.exe`
+- **`cpu_cores`**: Number of threads to use. Set to `0` to auto-detect (uses all cores).
 
-Example `batch_config.json` snippet:
+### 2. Rib Scaling
+Controls how internal reinforcement ribs are generated based on the base's surface area.
 ```json
-{
-    "base_sizes": [
-        {"Dim": 120.0, "Name": "Giant_Base"}
-    ],
-    "scaling_thresholds": {
-        "small": {"area": 800, "magnets": 1, "ribs": 3}
+"rib_scaling": [
+    {"area": 490, "ribs": 2, "thickness": 0.8},
+    {"area": 2000, "ribs": 3, "thickness": 0.8},
+    ...
+]
+```
+- **`area`**: If base area > this value, use these settings.
+- **`ribs`**: Number of ribs per magnet pocket.
+- **`thickness`**: Thickness of the ribs (must be a multiple of nozzle size, e.g., 0.4mm).
+
+### 3. Magnet Matrices
+Defines the exact number of magnets for each base size, specific to the sheet type.
+
+```json
+"magnet_matrices": {
+    "steel_rubber": {
+        "name": "Steel Rubber Sheet",
+        "file_suffix": "_SteelRubber",
+        "rules": [
+             { "Base": "25_mm_Round", "Counts": [1, 1, ...]},
+             ...
+        ]
     }
 }
 ```
+- **`rules`**: A list mapping Base Names to magnet counts.
+- **`Counts`**: An array corresponding to the `magnet_sizes` list (e.g., index 0 = 5x2mm, index 1 = 6x2mm).
+- **`0`**: Indicates a configuration should be skipped (e.g., magnet too big for base).
 
 ---
 
-## 🔧 Integration Details
+## 🛠️ Troubleshooting
 
-The automation pipeline consists of:
-1.  **`base_generator.scad`**: The core parametric design.
-2.  **`generate_batches.py`**: The parallel process orchestrator.
-3.  **`build_bambu_project.py`**: A helper module to construct valid `.3mf` files (bypassing the need for Bambu Studio to be installed).
+**"FileNotFoundError: [Errno 2] No such file or directory..."**
+- This usually means the script failed to create the output directory before saving.
+- **Fix**: Ensure you have write permissions to the `generated files/` folder. The script has been updated to fix this, so ensure you are running the latest version.
 
-For detailed parameter control, refer to [USER_CONTROLS.md](References/USER_CONTROLS.md).
+**"Can't open input file 'base_generator.scad'!"**
+- The script cannot find the OpenSCAD source file.
+- **Fix**: Ensure `base_generator.scad` is in the same folder as `generate_batches.py` (or correctly referenced in the script).
+
+**"Magnets overlap or are too close together!"**
+- This is an OpenSCAD assertion error.
+- **Cause**: You are trying to fit too many magnets into a small base (e.g., 12 magnets in a 25mm base).
+- **Fix**: Update the `magnet_matrices` in `batch_config.json` to set the count to `0` for that specific size/magnet combo.
 
 ---
 
-## ⚠️ Legacy Automation (PowerShell)
+## 📝 Editing the Script
 
-The old PowerShell script is preserved as a fallback:
+- **Script**: `batch_generator/generate_batches.py`
+- **Logic**:
+    1.  Loads config.
+    2.  Iterates through `shapes` (Round, Square, Hex, Octagon) and `oval_sizes`.
+    3.  Iterates through `magnet_matrices` (Steel Rubber, Magnetic Sheet).
+    4.  Calculates parameters (Area, Ribs).
+    5.  Renders STLs in parallel.
+    6.  Zips STLs into `.3mf` files.
 
-```powershell
-.\generate_all_final_batches.ps1
-```
-
-**Note**: This script is single-threaded and significantly slower than the Python version. It is no longer actively maintained.
-
+If you need to add a new shape, add it to the `shapes` list in `batch_config.json` first.
