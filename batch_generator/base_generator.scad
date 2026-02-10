@@ -374,8 +374,16 @@ assert(!has_magnet || magnet_thick > 0,
 base_boundary_radius = is_oval ? oval_width / 2 : base_size / 2;
 
 // Auto-Placement Logic
-actual_pair_distance = auto_magnet_placement ? base_boundary_radius : magnet_pair_distance_mm;
+actual_pair_distance = (auto_magnet_placement) ? 
+    (is_oval ? oval_length / 2 : base_boundary_radius) : 
+    magnet_pair_distance_mm;
+
 actual_ring_radius = auto_magnet_placement ? base_boundary_radius / 2 : magnet_ring_radius_mm;
+
+// Oval Ring Semi-Axes (Parametric Ellipse)
+// Follows the same "half-radius" logic: A = L/4, B = W/4
+oval_ring_a = auto_magnet_placement ? oval_length / 4 : magnet_ring_radius_mm * (oval_length / oval_width);
+oval_ring_b = auto_magnet_placement ? oval_width / 4 : magnet_ring_radius_mm;
 
 // Effective magnet count (1 if pockets are disabled)
 effective_count = has_magnet ? magnet_count : 1;
@@ -409,11 +417,25 @@ max_pair_distance = (effective_boundary - magnet_effective_radius) * 2;
 max_ring_radius = effective_boundary - magnet_effective_radius;
 
 // Boundary validation (magnets must stay within effective boundary)
-assert(!has_magnet || max_magnet_extent <= effective_boundary,
-    str("\nERROR: Magnet(s) extend beyond the base edge!\n",
-        "FIX: ", (effective_count == 2) ? 
-            str("Reduce 'magnet_pair_distance_mm' to ", floor(max_pair_distance * 10) / 10, "mm or less.") :
-            str("Reduce 'magnet_ring_radius_mm' to ", floor(max_ring_radius * 10) / 10, "mm or less, OR use smaller magnets.")));
+if (is_oval) {
+    // Check both major and minor axes for ovals
+    effective_boundary_l = (oval_length / 2) - min_outer_wall_mm;
+    effective_boundary_w = (oval_width / 2) - min_outer_wall_mm;
+    
+    max_extent_l = (effective_count == 2) ? (actual_pair_distance / 2 + magnet_effective_radius) : 
+                   (effective_count > 2) ? (oval_ring_a + magnet_effective_radius) : magnet_effective_radius;
+    max_extent_w = (effective_count > 2) ? (oval_ring_b + magnet_effective_radius) : magnet_effective_radius;
+    
+    assert(!has_magnet || (max_extent_l <= effective_boundary_l && max_extent_w <= effective_boundary_w),
+        str("\nERROR: Magnet(s) extend beyond the oval boundary!\n",
+            "FIX: Increase base dimensions or use fewer/smaller magnets."));
+} else {
+    assert(!has_magnet || max_magnet_extent <= effective_boundary,
+        str("\nERROR: Magnet(s) extend beyond the base edge!\n",
+            "FIX: ", (effective_count == 2) ? 
+                str("Reduce 'magnet_pair_distance_mm' to ", floor(max_pair_distance * 10) / 10, "mm or less.") :
+                str("Reduce 'magnet_ring_radius_mm' to ", floor(max_ring_radius * 10) / 10, "mm or less, OR use smaller magnets.")));
+}
 
 // === MINIMUM WALL BETWEEN MAGNETS ===
 
@@ -637,12 +659,23 @@ module magnet_pocket_keepouts() {
                     // Ring Pockets (Case 3)
                     ring_count = effective_count - 1;
                     for (i = [1 : ring_count]) {
-                        rotate([0, 0, i * 360 / ring_count])
-                        translate([actual_ring_radius, 0, 0]) {
+                        angle = i * 360 / ring_count;
+                        
+                        // Placement logic duplication from place_at_magnet_positions
+                        // (Parametric ellipse if oval + 4+ ring magnets)
+                        offset = (is_oval && ring_count >= 4) ? 
+                                 [oval_ring_a * cos(angle), oval_ring_b * sin(angle), 0] :
+                                 [actual_ring_radius * cos(angle), actual_ring_radius * sin(angle), 0];
+                                 
+                        translate(offset) {
                             translate([0, 0, actual_pillar_recess - OVERLAP])
                             cylinder(r = keepout_radius, h = base_height - shell_top_thickness_mm - actual_pillar_recess + OVERLAP * 2, $fn = $fn);
                             
-                            if (enable_ribs) render_pocket_ribs(keepout_radius, ribs_per_pocket, false);
+                            if (enable_ribs) {
+                                // Rotate ribs to face origin
+                                rib_rotation = (is_oval && ring_count >= 4) ? atan2(offset[1], offset[0]) * 180 / PI : angle;
+                                render_pocket_ribs(keepout_radius, ribs_per_pocket, false, rib_rotation);
+                            }
                         }
                     }
                 }
@@ -653,7 +686,7 @@ module magnet_pocket_keepouts() {
 
 // Helper to render ribs for a single pocket
 // center_mode: if true, uses 45-deg offsets (standard X). If false, first rib points to origin.
-module render_pocket_ribs(keepout_radius, count, center_mode) {
+module render_pocket_ribs(keepout_radius, count, center_mode, base_rotation = 0) {
     max_dim = is_oval ? max(oval_length, oval_width) : base_size;
     eff_rib_cube_len = (rib_length_mm > 0) ? (keepout_radius + rib_length_mm) * 2 : max_dim * 2;
     eff_rib_h = auto_rib_height ? (pocket_depth * 0.75) : rib_height_mm;
@@ -663,7 +696,7 @@ module render_pocket_ribs(keepout_radius, count, center_mode) {
     angle_step = 360 / count;
     // Initial offset: 180 points to center in the local frame of ring magnets
     // center_mode uses 45 for the X look.
-    start_angle = center_mode ? 45 : 180;
+    start_angle = center_mode ? 45 : 180 + base_rotation;
     
     for (i = [0 : count - 1]) {
         rotate([0, 0, start_angle + i * angle_step])
@@ -766,9 +799,21 @@ module place_at_magnet_positions() {
         // Ring magnets
         ring_count = effective_count - 1;
         for (i = [1 : ring_count]) {
-            rotate([0, 0, i * 360 / ring_count])
-            translate([actual_ring_radius, 0, 0])
-            children();
+            angle = i * 360 / ring_count;
+            if (is_oval && ring_count >= 4) {
+                // Parametric ellipse distribution
+                // x = a*cos(t), y=b*sin(t)
+                x = oval_ring_a * cos(angle);
+                y = oval_ring_b * sin(angle);
+                translate([x, y, 0])
+                rotate([0, 0, atan2(y, x) * 180 / PI]) // Face center
+                children();
+            } else {
+                // Standard circular distribution
+                rotate([0, 0, angle])
+                translate([actual_ring_radius, 0, 0])
+                children();
+            }
         }
     }
 }
