@@ -934,21 +934,23 @@ module oval_tapered_layer(h, l1, w1, l2, w2) {
 module rounded_tapered_polygon_layer(h, r1, r2, corner_r) {
     if (h > 0) {
         // Hull two thin 2D slices instead of N 3D cylinders
-        // This reduces the complexity of the 3D hull operation significantly
+        // This is strictly internal to [0, h] to prevent Z-height leakage.
         hull() {
-            translate([0,0,-OVERLAP]) linear_extrude(0.01+OVERLAP) rounded_polygon_2d(r1, corner_r);
-            translate([0,0,h-0.01]) linear_extrude(0.01+OVERLAP) rounded_polygon_2d(r2, corner_r);
+            translate([0,0,0]) linear_extrude(0.01) rounded_polygon_2d(r1, corner_r);
+            translate([0,0,h-0.01]) linear_extrude(0.01) rounded_polygon_2d(r2, corner_r);
         }
     }
 }
 
 // 2D helper: Creates the rounded polygon profile
 module rounded_polygon_2d(r, corner_r) {
-    // r is the circumradius of the ideal sharp polygon
-    // The centers of the corner circles must be placed such that the outer edge is at r
-    // For a circle at distance d with radius c, the outer extent is d+c.
-    // So we position at r - corner_r.
-    r_adj = r - corner_r;
+    // r is the CIRCUMRADIUS of the sharp polygon (used for calculations)
+    // To ensure the flat sides are exactly tangent to the desired footprint,
+    // we must adjust the circle centers so that (Center_Apothem + corner_r) = desired_apothem.
+    // desired_apothem = r * cos(180/n)
+    
+    apothem_target = r * cos(180/poly_sides);
+    r_adj = (apothem_target - corner_r) / cos(180 / poly_sides);
     
     hull() {
         for (i = [0 : poly_sides - 1]) {
