@@ -70,6 +70,9 @@ reinforcement_layer_mm = 1.0; // [0.0:0.1:5.0]
 // Enable reinforcement ribs for magnet pockets
 enable_ribs = true;
 
+// Use 'Smart Ribs' network logic (connects pockets to each other and wall)
+enable_smart_ribs = true;
+
 // Thickness of reinforcement ribs in mm
 rib_thickness_mm = 0.8; // [0.4:0.1:3.0]
 
@@ -611,6 +614,36 @@ module shell_cavity() {
 //          MAGNET SYSTEM MODULES
 // ==========================================
 
+// ==========================================
+//          RIB SYSTEM HELPERS
+// ==========================================
+
+// Returns the [x, y] coordinates for a magnet index
+function get_mag_pos(idx) = 
+    (effective_count == 1) ? [0, 0] :
+    (effective_count == 2) ? ( (idx == 0) ? [-actual_pair_distance/2, 0] : [actual_pair_distance/2, 0] ) :
+    (idx == 0) ? [0, 0] : // Center for 3+
+    let(ring_idx = idx, 
+        ring_count = effective_count - 1,
+        angle = ring_idx * 360 / ring_count)
+    (is_oval && ring_count >= 4) ? 
+        [oval_ring_a * cos(angle), oval_ring_b * sin(angle)] :
+        [actual_ring_radius * cos(angle), actual_ring_radius * sin(angle)];
+
+// Draws a single rib segment between two arbitrary points
+module draw_rib_segment(p1, p2) {
+    p_diff = p2 - p1;
+    dist = norm(p_diff);
+    angle = atan2(p_diff[1], p_diff[0]);
+    eff_rib_h = auto_rib_height ? (pocket_depth * 0.75) : rib_height_mm;
+    start_z = base_height - shell_top_thickness_mm;
+    
+    translate(p1)
+    rotate([0, 0, angle])
+    translate([dist/2, 0, start_z - eff_rib_h / 2])
+    cube([dist, rib_thickness_mm, eff_rib_h], center=true);
+}
+
 // Creates solid keepout zones around each magnet pocket position
 // These zones prevent the shell cavity from cutting into the pocket walls
 module magnet_pocket_keepouts() {
@@ -627,52 +660,116 @@ module magnet_pocket_keepouts() {
     
     union() {
         if (has_magnet) {
-            if (effective_count == 1) {
-                // Case 1: Single pocket - standard 4-way support
+            // 1. PLACE CYLINDERS (Solid pillars around pockets)
+            place_at_magnet_positions() {
                 translate([0, 0, actual_pillar_recess - OVERLAP])
                 cylinder(r = keepout_radius, h = base_height - shell_top_thickness_mm - actual_pillar_recess + OVERLAP * 2, $fn = $fn);
-                
-                if (enable_ribs) {
-                    render_pocket_ribs(keepout_radius, ribs_per_pocket, true); // True = centered X pattern
-                }
-            } else {
-                // Case 2 & 3: Multi-magnet
-                // Loop through positions manually to handle center vs outer logic
-                
-                // Outer Pockets (Case 3)
-                if (effective_count == 2) {
-                    for (i = [0, 180]) {
-                        rotate([0, 0, i])
-                        translate([actual_pair_distance / 2, 0, 0]) {
-                            translate([0, 0, actual_pillar_recess - OVERLAP])
-                            cylinder(r = keepout_radius, h = base_height - shell_top_thickness_mm - actual_pillar_recess + OVERLAP * 2, $fn = $fn);
+            }
+            
+            // 2. PLACE RIBS
+            if (enable_ribs) {
+                if (enable_smart_ribs && effective_count > 1) {
+                    // SMART RIBBING (Network Logic)
+                    if (effective_count == 2) {
+                        // Axis mode: Simple continuous bar + optional bracing
+                        p0 = get_mag_pos(0);
+                        p1 = get_mag_pos(1);
+                        draw_rib_segment(p0, p1);
+                        
+                        if (ribs_per_pocket >= 2) {
+                            num_braces_per_mag = ribs_per_pocket - 1;
+                            for (i = [0, 1]) {
+                                p_i = get_mag_pos(i);
+                                base_angle = (i == 0) ? 180 : 0;
+                                max_dim = is_oval ? max(oval_length, oval_width) : base_size;
+                                
+                                for (b = [0 : num_braces_per_mag - 1]) {
+                                    spread = 90; 
+                                    offset = (num_braces_per_mag == 1) ? 0 : (b * spread / (num_braces_per_mag - 1)) - (spread / 2);
+                                    brace_angle = base_angle + offset;
+                                    p_wall = p_i + [cos(brace_angle) * max_dim, sin(brace_angle) * max_dim];
+                                    draw_rib_segment(p_i, p_wall);
+                                }
+                            }
+                        }
+                    } else {
+                        // Ring/Web mode
+                        p_center = [0, 0];
+                        ring_count = effective_count - 1;
+                        
+                        for (i = [1 : ring_count]) {
+                            p_i = get_mag_pos(i);
                             
-                            if (enable_ribs) render_pocket_ribs(keepout_radius, ribs_per_pocket, false);
+                            // A. Radial to Center (k=0)
+                            if (ribs_per_pocket >= 1) {
+                                draw_rib_segment(p_center, p_i);
+                            }
+                            
+                            // B. LATTICE JUMPS (k=1 to 4)
+                            // Jump Logic: 
+                            // - k < N/2: 2 connections per pocket (left/right).
+                            // - k = N/2: 1 connection per pocket (diameter).
+                            
+                            for (k = [1 : 4]) {
+                                threshold = (k == 1) ? 3 : (k == 2) ? 5 : (k == 3) ? 10 : 11;
+                                
+                                if (ribs_per_pocket >= threshold && k <= ring_count / 2) {
+                                    if (k < ring_count / 2) {
+                                        // Standard symmetric jump
+                                        hop_idx = ((i + k - 1) % ring_count) + 1;
+                                        draw_rib_segment(p_i, get_mag_pos(hop_idx));
+                                    } else if (i <= ring_count / 2) {
+                                        // Diameter jump: draw once per pair
+                                        diag_idx = ((i + k - 1) % ring_count) + 1;
+                                        draw_rib_segment(p_i, get_mag_pos(diag_idx));
+                                    }
+                                }
+                            }
+                            
+                            // C. WALL BRACING - Use remaining budget
+                            used_ribs = (ribs_per_pocket >= 1 ? 1 : 0) + 
+                                (ribs_per_pocket >= 3 && 1 < ring_count/2 ? 2 : (ribs_per_pocket >= 3 && 1 == ring_count/2 ? 1 : 0)) + 
+                                (ribs_per_pocket >= 5 && 2 < ring_count/2 ? 2 : (ribs_per_pocket >= 5 && 2 == ring_count/2 ? 1 : 0)) +
+                                (ribs_per_pocket >= 10 && 3 < ring_count/2 ? 2 : (ribs_per_pocket >= 10 && 3 == ring_count/2 ? 1 : 0)) +
+                                (ribs_per_pocket >= 11 && 4 < ring_count/2 ? 2 : (ribs_per_pocket >= 11 && 4 == ring_count/2 ? 1 : 0));
+                            
+                            num_wall_braces = max(0, ribs_per_pocket - used_ribs);
+                            
+                            if ( (ribs_per_pocket == 2) || (num_wall_braces > 0) ) {
+                                pocket_angle = atan2(p_i[1], p_i[0]);
+                                max_dim = is_oval ? max(oval_length, oval_width) : base_size;
+                                
+                                for (b = [0 : num_wall_braces - 1]) {
+                                    spread = 60;
+                                    offset = (num_wall_braces == 1) ? 0 : (b * spread / (num_wall_braces - 1)) - (spread / 2);
+                                    
+                                    brace_angle = pocket_angle + offset;
+                                    p_wall = p_i + [cos(brace_angle) * max_dim, sin(brace_angle) * max_dim];
+                                    draw_rib_segment(p_i, p_wall);
+                                }
+                            }
                         }
                     }
                 } else {
-                    // Center Pocket (Case 2: NO RIBS)
-                    translate([0, 0, actual_pillar_recess - OVERLAP])
-                    cylinder(r = keepout_radius, h = base_height - shell_top_thickness_mm - actual_pillar_recess + OVERLAP * 2, $fn = $fn);
-                    // No render_pocket_ribs() called for center!
-                    
-                    // Ring Pockets (Case 3)
-                    ring_count = effective_count - 1;
-                    for (i = [1 : ring_count]) {
-                        angle = i * 360 / ring_count;
-                        
-                        // Placement logic duplication from place_at_magnet_positions
-                        // (Parametric ellipse if oval + 4+ ring magnets)
-                        offset = (is_oval && ring_count >= 4) ? 
-                                 [oval_ring_a * cos(angle), oval_ring_b * sin(angle), 0] :
-                                 [actual_ring_radius * cos(angle), actual_ring_radius * sin(angle), 0];
-                                 
-                        translate(offset) {
-                            translate([0, 0, actual_pillar_recess - OVERLAP])
-                            cylinder(r = keepout_radius, h = base_height - shell_top_thickness_mm - actual_pillar_recess + OVERLAP * 2, $fn = $fn);
-                            
-                            if (enable_ribs) {
-                                // Rotate ribs to face origin
+                    // LEGACY RIBBING (Independent Spokes)
+                    if (effective_count == 1) {
+                        render_pocket_ribs(keepout_radius, ribs_per_pocket, true);
+                    } else if (effective_count == 2) {
+                        for (i = [0, 180]) {
+                            rotate([0, 0, i])
+                            translate([actual_pair_distance / 2, 0, 0])
+                            render_pocket_ribs(keepout_radius, ribs_per_pocket, false);
+                        }
+                    } else {
+                        // Ring pockets only
+                        ring_count = effective_count - 1;
+                        for (i = [1 : ring_count]) {
+                            angle = i * 360 / ring_count;
+                            offset = (is_oval && ring_count >= 4) ? 
+                                     [oval_ring_a * cos(angle), oval_ring_b * sin(angle), 0] :
+                                     [actual_ring_radius * cos(angle), actual_ring_radius * sin(angle), 0];
+                                     
+                            translate(offset) {
                                 rib_rotation = (is_oval && ring_count >= 4) ? atan2(offset[1], offset[0]) * 180 / PI : angle;
                                 render_pocket_ribs(keepout_radius, ribs_per_pocket, false, rib_rotation);
                             }
