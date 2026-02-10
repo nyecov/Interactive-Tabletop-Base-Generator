@@ -31,6 +31,12 @@ ITB is a parametric OpenSCAD script that generates customizable, magnet-ready ba
 4. Press **F5** to preview, **F6** to render
 5. Export as STL: File → Export → Export as STL
 
+### Automation
+To generate all base sizes and shapes automatically:
+```bash
+python generate_batches.py
+```
+
 ---
 
 ## 📐 Parameter Guide
@@ -99,10 +105,15 @@ ITB is a parametric OpenSCAD script that generates customizable, magnet-ready ba
 
 ```
 ITB/
-├── base_generator.scad      # Main OpenSCAD script
-├── OpenSCAD_Cheatsheet.md   # Quick reference for OpenSCAD syntax
-├── 2inch round base.stl     # Example STL output
-└── README.md                # This file
+├── batch_generator/             # Automation tools
+│   ├── base_generator.scad      # Main OpenSCAD script
+│   ├── generate_batches.py      # Python batch generation script
+│   ├── build_bambu_project.py   # 3MF Builder module
+│   ├── batch_config.json        # Configuration file
+│   └── slicer_settings_reference.3mf # Template
+├── OpenSCAD_Cheatsheet.md       # Quick reference for OpenSCAD syntax
+├── 2inch round base.stl         # Example STL output
+└── README.md                    # This file
 ```
 
 ---

@@ -1,0 +1,154 @@
+{
+    "openscad_path": "C:\\Program Files\\OpenSCAD (Nightly)\\openscad.exe",
+    "template_3mf": "slicer_settings_reference.3mf",
+    "cpu_cores": 0,
+    "scaling_thresholds": {
+        "small": {
+            "area": 800,
+            "magnets": 1,
+            "ribs": 3
+        },
+        "medium": {
+            "area": 2500,
+            "magnets": 2,
+            "ribs": 3
+        },
+        "large": {
+            "area": 6000,
+            "magnets": 4,
+            "ribs": 3
+        },
+        "huge": {
+            "magnets": 7,
+            "ribs": 3
+        }
+    },
+    "base_sizes": [
+        {
+            "Dim": 25.4,
+            "Name": "1_inch"
+        },
+        {
+            "Dim": 50.8,
+            "Name": "2_inch"
+        },
+        {
+            "Dim": 76.2,
+            "Name": "3_inch"
+        },
+        {
+            "Dim": 25.0,
+            "Name": "25_mm"
+        },
+        {
+            "Dim": 28.0,
+            "Name": "28_mm"
+        },
+        {
+            "Dim": 32.0,
+            "Name": "32_mm"
+        },
+        {
+            "Dim": 40.0,
+            "Name": "40_mm"
+        },
+        {
+            "Dim": 50.0,
+            "Name": "50_mm"
+        },
+        {
+            "Dim": 60.0,
+            "Name": "60_mm"
+        },
+        {
+            "Dim": 65.0,
+            "Name": "65_mm"
+        },
+        {
+            "Dim": 70.0,
+            "Name": "70_mm"
+        },
+        {
+            "Dim": 80.0,
+            "Name": "80_mm"
+        },
+        {
+            "Dim": 100.0,
+            "Name": "100_mm"
+        },
+        {
+            "Dim": 130.0,
+            "Name": "130_mm"
+        },
+        {
+            "Dim": 160.0,
+            "Name": "160_mm"
+        }
+    ],
+    "oval_sizes": [
+        {
+            "L": 60,
+            "W": 35,
+            "Name": "60x35_mm"
+        },
+        {
+            "L": 75,
+            "W": 42,
+            "Name": "75x42_mm"
+        },
+        {
+            "L": 90,
+            "W": 52,
+            "Name": "90x52_mm"
+        },
+        {
+            "L": 105,
+            "W": 70,
+            "Name": "105x70_mm"
+        },
+        {
+            "L": 120,
+            "W": 92,
+            "Name": "120x92_mm"
+        },
+        {
+            "L": 150,
+            "W": 95,
+            "Name": "150x95_mm"
+        },
+        {
+            "L": 170,
+            "W": 105,
+            "Name": "170x105_mm"
+        }
+    ],
+    "shapes": [
+        {
+            "Type": "Round",
+            "Sides": 0,
+            "Index": 0,
+            "BaseName": "RoundBase"
+        },
+        {
+            "Type": "Polygon",
+            "Sides": 4,
+            "Name": "square",
+            "Index": 1,
+            "BaseName": "SquareBase"
+        },
+        {
+            "Type": "Polygon",
+            "Sides": 6,
+            "Name": "hex",
+            "Index": 1,
+            "BaseName": "HexBase"
+        },
+        {
+            "Type": "Polygon",
+            "Sides": 8,
+            "Name": "oct",
+            "Index": 1,
+            "BaseName": "OctBase"
+        }
+    ]
+}

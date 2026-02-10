@@ -1,166 +1,77 @@
 # OpenSCAD Automation Guide
 
-This directory contains scripts to automate the rendering of OpenSCAD files without opening the GUI.
+This project uses **Python** and **OpenSCAD** to automate the generation of wargaming bases.
 
 ## Prerequisites
 
-1. **Install OpenSCAD** (if not already installed):
-   - Download from: https://openscad.org/downloads.html
-   - Default installation path: `C:\Program Files\OpenSCAD\openscad.exe`
+1.  **OpenSCAD**
+    *   Download: [openscad.org](https://openscad.org/downloads.html)
+    *   **Version requirement**: 2026.02.09 (Nightly) or newer for Manifold support.
+    *   Default Path: `C:\Program Files\OpenSCAD (Nightly)\openscad.exe`
+    *   *(If your path is different, update `generate_batches.py`)*
 
-2. **Verify Installation**:
-   ```powershell
-   & "C:\Program Files\OpenSCAD\openscad.exe" --version
-   ```
+2.  **Python 3.6+**
+    *   Required for running the build scripts.
 
 ## Usage
 
-### 1. Simple Rendering (`render.ps1`)
+### 🚀 Generate All Batches
+To generate all base sizes (Round, Square, Hex, Octagon, Oval) in both "Magnet" and "Bare" configurations:
 
-Renders the current `base_generator.scad` with its current parameter settings.
-
-**Basic usage:**
-```powershell
-.\render.ps1
+```bash
+cd batch_generator
+python generate_batches.py
 ```
 
-**Options:**
-```powershell
-# Render to a specific output name
-.\render.ps1 -OutputName "my_base"
+**What it does:**
+1.  **Parallel Rendering**: Uses all CPU cores to render STLs with OpenSCAD.
+2.  **Manifold Optimization**: Uses the `--enable=manifold` flag for high-speed rendering.
+3.  **3MF Assembly**: Bundles the STLs into Bambu Studio project files (`.3mf`) with correct slicer settings.
+4.  **Output**: Files are saved in the `generated files/` directory.
 
-# Render only STL
-.\render.ps1 -Format stl
+---
 
-# Render only 3MF
-.\render.ps1 -Format 3mf
+## ⚙️ Configuration (`batch_config.json`)
 
-# Custom OpenSCAD path
-.\render.ps1 -OpenScadPath "D:\Programs\OpenSCAD\openscad.exe"
-```
+All batch generation settings are stored in `batch_config.json`. You can modify this file to:
 
-### 2. Batch Preset Rendering (`render_presets.ps1`)
+-   **Change OpenSCAD Path**: Update `"openscad_path"` if your installation is different.
+-   **Add New Base Sizes**: Add entries to `"base_sizes"` or `"oval_sizes"`.
+-   **Tweak Magnet Logic**: Adjust `"scaling_thresholds"` to change when ribs/magnets are added based on area.
+-   **Set CPU Cores**: Manually set `"cpu_cores"` (0 = Auto-detect).
 
-Renders multiple predefined configurations automatically.
-
-**Usage:**
-```powershell
-.\render_presets.ps1
-```
-
-This will generate:
-- `1inch_round_base.3mf`
-- `1inch_round_base_with_magnet.3mf`
-- `2inch_round_base.3mf`
-- `2inch_round_base_with_magnets.3mf`
-- `40mm_round_base.3mf`
-
-**Customize presets:**
-Edit `render_presets.ps1` and modify the `$presets` array to add your own configurations.
-
-### 3. Command-Line Parameter Overrides
-
-You can override any parameter directly from the command line:
-
-```powershell
-& "C:\Program Files\OpenSCAD\openscad.exe" `
-  -o "custom_base.3mf" `
-  -D base_size_preset='"40mm"' `
-  -D base_height_mm=5.0 `
-  -D enable_magnet_pockets=true `
-  -D magnet_count=3 `
-  base_generator.scad
-```
-
-**Important:** String parameters need double quotes escaped: `'"value"'`
-
-## Advanced Options
-
-### Render Quality
-
-OpenSCAD uses `$fn` for resolution. You can override it:
-
-```powershell
-openscad -o output.stl -D '$fn=200' base_generator.scad
-```
-
-### Camera View (for PNG exports)
-
-```powershell
-openscad -o preview.png --camera=0,0,0,55,0,25,500 base_generator.scad
-```
-
-### Automatic Rendering on File Change
-
-Create a file watcher (requires additional setup):
-
-```powershell
-# Install file watcher (one-time)
-Install-Module -Name FileSystemWatcher
-
-# Watch for changes
-$watcher = New-Object System.IO.FileSystemWatcher
-$watcher.Path = "."
-$watcher.Filter = "base_generator.scad"
-$watcher.NotifyFilter = [System.IO.NotifyFilters]::LastWrite
-
-Register-ObjectEvent $watcher Changed -Action {
-    Write-Host "File changed, re-rendering..."
-    .\render.ps1
+Example `batch_config.json` snippet:
+```json
+{
+    "base_sizes": [
+        {"Dim": 120.0, "Name": "Giant_Base"}
+    ],
+    "scaling_thresholds": {
+        "small": {"area": 800, "magnets": 1, "ribs": 3}
+    }
 }
 ```
 
-## Troubleshooting
+---
 
-### Script Execution Policy Error
+## 🔧 Integration Details
 
-If you get an execution policy error:
+The automation pipeline consists of:
+1.  **`base_generator.scad`**: The core parametric design.
+2.  **`generate_batches.py`**: The parallel process orchestrator.
+3.  **`build_bambu_project.py`**: A helper module to construct valid `.3mf` files (bypassing the need for Bambu Studio to be installed).
 
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
+For detailed parameter control, refer to [USER_CONTROLS.md](References/USER_CONTROLS.md).
 
-### OpenSCAD Not Found
+---
 
-If OpenSCAD is installed in a non-standard location, specify the path:
+## ⚠️ Legacy Automation (PowerShell)
 
-```powershell
-.\render.ps1 -OpenScadPath "D:\YourPath\openscad.exe"
-```
-
-### Long Render Times
-
-For complex models:
-1. Reduce `$fn` value during testing
-2. Use STL format (faster than 3MF)
-3. Disable shelling/hollowing temporarily
-
-## Integration with Build Systems
-
-### Task Scheduler (Windows)
-
-Create a scheduled task to render daily:
+The old PowerShell script is preserved as a fallback:
 
 ```powershell
-$action = New-ScheduledTaskAction -Execute "PowerShell.exe" `
-  -Argument "-File C:\Users\Furiosa\SCAD\render.ps1"
-$trigger = New-ScheduledTaskTrigger -Daily -At 2am
-Register-ScheduledTask -TaskName "Daily Base Render" -Action $action -Trigger $trigger
+.\generate_all_final_batches.ps1
 ```
 
-### Git Hook (Pre-commit)
+**Note**: This script is single-threaded and significantly slower than the Python version. It is no longer actively maintained.
 
-Automatically render when committing:
-
-Create `.git/hooks/pre-commit`:
-```bash
-#!/bin/sh
-powershell.exe -File render.ps1
-git add *.stl *.3mf
-```
-
-## Additional Resources
-
-- [OpenSCAD User Manual](https://en.wikibooks.org/wiki/OpenSCAD_User_Manual)
-- [OpenSCAD Cheat Sheet](https://openscad.org/cheatsheet/)
-- [Command-Line Options](https://en.wikibooks.org/wiki/OpenSCAD_User_Manual/Using_OpenSCAD_in_a_command_line_environment)

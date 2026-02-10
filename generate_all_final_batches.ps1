@@ -8,8 +8,8 @@ param(
 
 $BaseDir = Get-Location
 $GeneratedDir = Join-Path $BaseDir "generated files"
-$InputScad = "base_generator.scad"
-$Template3mf = "slicer_settings_reference.3mf"
+$InputScad = "batch_generator\base_generator.scad"
+$Template3mf = "batch_generator\slicer_settings_reference.3mf"
 
 # Ensure root directories exist
 foreach ($sub in @("Magnet", "Bare")) {
@@ -42,8 +42,8 @@ $shapes = @(
 )
 
 function Get-Scaling($Area) {
-    if ($Area -lt 800) { return @{ MagCount = 1; Ribs = 2 } }
-    if ($Area -lt 2500) { return @{ MagCount = 2; Ribs = 2 } }
+    if ($Area -lt 800) { return @{ MagCount = 1; Ribs = 3 } }
+    if ($Area -lt 2500) { return @{ MagCount = 2; Ribs = 3 } }
     if ($Area -lt 6000) { return @{ MagCount = 4; Ribs = 3 } }
     return @{ MagCount = 7; Ribs = 3 }
 }
